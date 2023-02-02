@@ -15,12 +15,12 @@ To run this script, you must have Python installed on your computer. It is avail
 1. Clone the repository to your local machine by using the following command:
 
    Command - 
-   git clone https://github.com/prateekb123/Fetch_Prateek_Take_Home.git
+   git clone https://github.com/prateekb123/fetch_take_home_test_prateek.git
    
 2. Navigate to the project directory by using the following command:
 
    Command - 
-   cd Fetch_Prateek_Take_Home
+   cd fetch_take_home_test_prateek
 
 # Usage
 
