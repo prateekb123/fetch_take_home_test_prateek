@@ -167,9 +167,14 @@ def remove_negative_points_from_list(sorted_by_date_transaction_list, payer_inde
 
     # Creating a Map to maintain name and corresponding rows
     namePointMap = dict()
+    currPointMap = dict()
+    transaction_with_no_points = []
 
     # Iterating over the list of rows that is sorted by date
     for row in sorted_by_date_transaction_list:
+
+        if row[point_index] < 0 and currPointMap[row[payer_index]] < abs(row[point_index]):
+            raise ValueError(f'Not Enough Points with user {row[payer_index]} to take points out.')
 
         # If the payer does not exist in the hashMap we check if the point value is negative if yes
         # we cannot remove the points from the payer as they don't have points yet to take out,
@@ -179,29 +184,48 @@ def remove_negative_points_from_list(sorted_by_date_transaction_list, payer_inde
                 raise ValueError(f'Not Enough Points with user {row[payer_index]} to take points out.')
 
             namePointMap[row[payer_index]] = [row]
+            currPointMap[row[payer_index]] = row[point_index]
 
         else:
 
             # If the payer exist in the hashmap and the value of the points is negative we remove
             # the points from the payer according to the oldest date.
             if row[point_index] < 0:
-                for row_in_list in namePointMap[row[payer_index]]:
-                    if abs(row[point_index]) > row_in_list[point_index]:
-                        row_in_list[point_index] = 0
-                        row[point_index] += row_in_list[point_index]
+                index = 0
+                payerList = namePointMap[row[payer_index]]
+                while index < len(payerList):
+                # for row_in_list in namePointMap[row[payer_index]]:
+                    if abs(row[point_index]) > payerList[index][point_index]:
+                        row[point_index] += payerList[index][point_index]
+                        payerList[index][point_index] = 0
+                        transaction_with_no_points.append(payerList.pop(index))
+
+                    elif abs(row[point_index]) < payerList[index][point_index]:
+                        payerList[index][point_index] += row[point_index]
+                        row[point_index] = 0
+                        transaction_with_no_points.append(row)
+                        index += 1
+                        break
 
                     else:
-                        row_in_list[point_index] += row[point_index]
                         row[point_index] = 0
+                        payerList[index][point_index] = 0
+                        transaction_with_no_points.append(row)
+                        transaction_with_no_points.append(payerList.pop(index))
+                        break
+
+
+
 
                 # Raising an error if the points to be removed does not come to 0 after taking them out
                 # from the payers account.
-                if row[point_index] != 0:
-                    raise ValueError(f'Not Enough Points with user {row[payer_index]} to take points out.')
+                # if row[point_index] != 0:
+                #     raise ValueError(f'Not Enough Points with user {row[payer_index]} to take points out.')
             else:
                 namePointMap[row[payer_index]].append(row)
+                currPointMap[row[payer_index]] += row[point_index]
 
-    return namePointMap
+    return namePointMap, transaction_with_no_points
 
 
 def calculate_spend_points(sorted_by_date_transaction_list, spent_amount, point_index):
@@ -240,7 +264,7 @@ def calculate_spend_points(sorted_by_date_transaction_list, spent_amount, point_
     return sorted_by_date_transaction_list
 
 
-def create_json(final_transaction_list, payer_index, point_index):
+def create_response(final_transaction_list, payer_index, point_index):
     """
     This function takes in the list which contains rows and then create a hashmap according to each payer.
     :param final_transaction_list: The list which contains each row.
@@ -266,7 +290,7 @@ def create_json(final_transaction_list, payer_index, point_index):
     return payerPointMap
 
 
-def create_list_from_map(content_Map, timestamp_index):
+def create_list_from_map(content_Map, timestamp_index, transaction_with_no_points):
     """
     This fucntion converts the hashmap we got after removing the negative points from the list
     and convert it again into a list.
@@ -276,7 +300,7 @@ def create_list_from_map(content_Map, timestamp_index):
     Eg. - [['DANNON', 100, datetime.datetime(2020, 10, 31, 10, 0, tzinfo=datetime.timezone.utc)],
     ['UNILEVER', 200, datetime.datetime(2020, 10, 31, 11, 0, tzinfo=datetime.timezone.utc)],......]
     """
-    row_list = []
+    row_list = transaction_with_no_points
 
     # Iterating over the hashmap and putting the rows back in a list.
     for payer in content_Map:
@@ -303,16 +327,16 @@ def main(spent_amount):
     if total_points >= spent_amount:
 
         # Function to create a hashmap with adjusted negative points in the CSV.
-        content_Map = remove_negative_points_from_list(sorted_by_date_transaction_list, payer_index, point_index)
+        content_Map, transaction_with_no_points = remove_negative_points_from_list(sorted_by_date_transaction_list, payer_index, point_index)
 
         # This function call creates a list from the hashmap
-        updated_transaction_list = create_list_from_map(content_Map, timestamp_index)
+        updated_transaction_list = create_list_from_map(content_Map, timestamp_index, transaction_with_no_points)
 
         # Function to remove the points spent by user.
         final_transaction_list = calculate_spend_points(updated_transaction_list, spent_amount, point_index)
 
         # Printing the final Json output
-        print(create_json(final_transaction_list, payer_index, point_index))
+        print(create_response(final_transaction_list, payer_index, point_index))
 
     else:
         # Printing 'Insufficient points' if points are not enough.
@@ -321,6 +345,7 @@ def main(spent_amount):
 
 if __name__ == '__main__':
     # takes amount that has to be spent from the user
-    spent_amount = int(sys.argv[1])
+    # spent_amount = int(sys.argv[1])
+    spent_amount = 5000
 
     main(spent_amount)
